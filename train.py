@@ -35,10 +35,22 @@ TRAIN_PROTO = os.path.join(
     "ASVspoof2019.LA.cm.train.trn.txt"
 )
 
-DEV_PROTO = os.path.join(
-    PROTO_DIR,
-    "ASVspoof2019.LA.cm.dev.txt"
-)
+# ==========================
+# FIND DEV PROTOCOL
+# ==========================
+
+dev_files = [
+    f for f in os.listdir(PROTO_DIR)
+    if "dev" in f.lower() and f.endswith(".txt")
+]
+
+if len(dev_files) == 0:
+    raise FileNotFoundError("No DEV protocol file found!")
+
+DEV_PROTO = os.path.join(PROTO_DIR, dev_files[0])
+
+print("Using DEV protocol:", DEV_PROTO)
+
 
 
 SR = 16000
@@ -147,6 +159,10 @@ scaler = StandardScaler()
 
 Xtr = scaler.fit_transform(Xtr)
 Xdev = scaler.transform(Xdev)
+
+import joblib
+joblib.dump(scaler, "scaler.save")
+
 
 
 
