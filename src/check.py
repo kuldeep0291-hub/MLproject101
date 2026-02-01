@@ -118,7 +118,7 @@ def predict(file_name):
 if len(sys.argv) != 2:
 
     print("Usage:")
-    print("  python check.py audio_file")
+    print("  python src/check.py audio_file")
     exit()
 
 
