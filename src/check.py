@@ -11,8 +11,8 @@ import joblib
 # CONFIG
 # ============================
 
-MODEL_PATH = "best_model.keras"   # use best model
-SCALER_PATH = "scaler.save"       # created during training
+MODEL_PATH = "models/best_model.keras"   # use best model
+SCALER_PATH = "models/scaler.save"       # created during training
 
 SR = 16000
 N_MFCC = 40

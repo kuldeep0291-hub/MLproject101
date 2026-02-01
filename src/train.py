@@ -161,7 +161,7 @@ Xtr = scaler.fit_transform(Xtr)
 Xdev = scaler.transform(Xdev)
 
 import joblib
-joblib.dump(scaler, "scaler.save")
+joblib.dump(scaler, "models/scaler.save")
 
 
 
@@ -215,7 +215,7 @@ cb = [
     ),
 
     tf.keras.callbacks.ModelCheckpoint(
-        "best_model.keras",
+        "models/best_model.keras",
         save_best_only=True
     )
 ]
@@ -242,7 +242,7 @@ model.fit(
 # SAVE
 # ==========================
 
-model.save("final_model.keras")
+model.save("models/final_model.keras")
 
 print("Training finished!")
-print("Saved: final_model.keras")
+print("Saved: models/final_model.keras")
