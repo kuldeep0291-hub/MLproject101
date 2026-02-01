@@ -4,5 +4,5 @@ Then we start by bit by bit downloading and trainig via python file and also exp
 
 If you are using windows, use download_datasheet(windows+linux).py else use download_datasheet(Linux).py for better use.
 
-The file train.py trains your model on the files presented and the file model_LA.h5 is an example trained model.
+The file train.py trains your model on the files presented and the file final_model.keras and best_model.keras is an example trained model.
 
