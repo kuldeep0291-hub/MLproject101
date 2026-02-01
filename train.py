@@ -1,155 +1,183 @@
 import os
-import librosa
 import numpy as np
+import librosa
+import tensorflow as tf
 from tqdm import tqdm
-
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
 
+# ==========================
+# CONFIG
+# ==========================
 
-# ============================
-# BASE DIR
-# ============================
+BASE = "LA"
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-
-LA_DIR = os.path.join(BASE, "LA")
-
-
-# ============================
-# PATHS
-# ============================
-
-AUDIO_DIR = os.path.join(
-    LA_DIR,
+TRAIN_AUDIO = os.path.join(
+    BASE,
     "ASVspoof2019_LA_train",
     "flac"
 )
-# ============================
-# FIND PROTOCOL FILE
-# ============================
+
+DEV_AUDIO = os.path.join(
+    BASE,
+    "ASVspoof2019_LA_dev",
+    "flac"
+)
 
 PROTO_DIR = os.path.join(
-    LA_DIR,
+    BASE,
     "ASVspoof2019_LA_cm_protocols"
 )
 
-proto_files = [f for f in os.listdir(PROTO_DIR)
-               if "train" in f.lower() and f.endswith(".txt")]
+TRAIN_PROTO = os.path.join(
+    PROTO_DIR,
+    "ASVspoof2019.LA.cm.train.trn.txt"
+)
 
-if len(proto_files) == 0:
-    raise FileNotFoundError("No train protocol file found!")
+DEV_PROTO = os.path.join(
+    PROTO_DIR,
+    "ASVspoof2019.LA.cm.dev.txt"
+)
 
-PROTOCOL = os.path.join(PROTO_DIR, proto_files[0])
-
-print("Using protocol file:", PROTOCOL)
-
-
-
-# ============================
-# CONFIG
-# ============================
 
 SR = 16000
 N_MFCC = 40
 
 
-# ============================
-# MFCC
-# ============================
+EPOCHS = 50
+BATCH = 64
 
-def extract_mfcc(path):
 
-    y, sr = librosa.load(path, sr=SR)
+# ==========================
+# FEATURE
+# ==========================
+
+def extract(path):
+
+    y, _ = librosa.load(path, sr=SR)
 
     mfcc = librosa.feature.mfcc(
         y=y,
-        sr=sr,
+        sr=SR,
         n_mfcc=N_MFCC
     )
 
     return np.mean(mfcc.T, axis=0)
 
 
-# ============================
-# LOAD DATA
-# ============================
 
-def load_data():
+# ==========================
+# LOAD SET
+# ==========================
 
-    X, y = [], []
+def load_set(audio_dir, proto):
 
-    print("Loading LA train data...")
+    X = []
+    y = []
 
-    with open(PROTOCOL) as f:
+    with open(proto) as f:
 
-        for line in tqdm(f):
+        lines = f.readlines()
 
-            parts = line.strip().split()
+    print("Loading:", os.path.basename(proto))
 
-            file_id = parts[1]
-            label = parts[-1]
+    for line in tqdm(lines):
 
-            wav = os.path.join(AUDIO_DIR, file_id + ".flac")
+        p = line.strip().split()
 
-            if not os.path.exists(wav):
-                continue
+        fid = p[1]
+        lab = p[-1]
 
-            feat = extract_mfcc(wav)
+        path = os.path.join(audio_dir, fid + ".flac")
 
-            X.append(feat)
+        if not os.path.exists(path):
+            continue
 
-            y.append(0 if label=="bonafide" else 1)
+        feat = extract(path)
+
+        X.append(feat)
+
+        y.append(0 if lab=="bonafide" else 1)
 
     return np.array(X), np.array(y)
 
 
-# ============================
-# PREPARE
-# ============================
 
-X, y = load_data()
+# ==========================
+# LOAD DATA
+# ==========================
 
-print("Samples:", X.shape)
+print("Loading training data...")
+Xtr, Ytr = load_set(TRAIN_AUDIO, TRAIN_PROTO)
 
+print("Loading dev data...")
+Xdev, Ydev = load_set(DEV_AUDIO, DEV_PROTO)
+
+
+
+# ==========================
+# BALANCE CLASSES
+# ==========================
+
+print("Balancing data...")
+
+idx0 = np.where(Ytr==0)[0]
+idx1 = np.where(Ytr==1)[0]
+
+m = min(len(idx0), len(idx1))
+
+idx = np.concatenate([
+    np.random.choice(idx0, m, False),
+    np.random.choice(idx1, m, False)
+])
+
+np.random.shuffle(idx)
+
+Xtr = Xtr[idx]
+Ytr = Ytr[idx]
+
+
+
+# ==========================
+# NORMALIZE
+# ==========================
 
 scaler = StandardScaler()
-X = scaler.fit_transform(X)
+
+Xtr = scaler.fit_transform(Xtr)
+Xdev = scaler.transform(Xdev)
 
 
-Xtr, Xte, ytr, yte = train_test_split(
-    X, y,
-    test_size=0.2,
-    random_state=42,
-    stratify=y
-)
 
-
-# ============================
+# ==========================
 # MODEL
-# ============================
+# ==========================
 
-model = Sequential([
+model = tf.keras.Sequential([
 
-    Dense(256, activation="relu", input_shape=(N_MFCC,)),
-    Dropout(0.3),
+    tf.keras.layers.Input(shape=(N_MFCC,)),
 
-    Dense(128, activation="relu"),
-    Dropout(0.3),
+    tf.keras.layers.Dense(256),
+    tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.ReLU(),
+    tf.keras.layers.Dropout(0.4),
 
-    Dense(64, activation="relu"),
-    Dropout(0.3),
+    tf.keras.layers.Dense(128),
+    tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.ReLU(),
+    tf.keras.layers.Dropout(0.3),
 
-    Dense(1, activation="sigmoid")
+    tf.keras.layers.Dense(64),
+    tf.keras.layers.BatchNormalization(),
+    tf.keras.layers.ReLU(),
+
+    tf.keras.layers.Dense(1, activation="sigmoid")
 ])
 
 
 model.compile(
-    optimizer="adam",
+    optimizer=tf.keras.optimizers.Adam(1e-3),
     loss="binary_crossentropy",
     metrics=["accuracy"]
 )
@@ -158,24 +186,47 @@ model.compile(
 model.summary()
 
 
-# ============================
-# TRAIN
-# ============================
 
-print("Training started...")
+# ==========================
+# CALLBACKS
+# ==========================
+
+cb = [
+
+    tf.keras.callbacks.EarlyStopping(
+        patience=8,
+        restore_best_weights=True
+    ),
+
+    tf.keras.callbacks.ModelCheckpoint(
+        "best_model.keras",
+        save_best_only=True
+    )
+]
+
+
+# ==========================
+# TRAIN
+# ==========================
+
+print("Training...")
 
 model.fit(
-    Xtr, ytr,
-    validation_data=(Xte, yte),
-    epochs=25,
-    batch_size=64
+    Xtr, Ytr,
+    validation_data=(Xdev, Ydev),
+    epochs=EPOCHS,
+    batch_size=BATCH,
+    callbacks=cb,
+    shuffle=True
 )
 
 
-# ============================
+
+# ==========================
 # SAVE
-# ============================
+# ==========================
 
-model.save(os.path.join(BASE, "model_LA.h5"))
+model.save("final_model.keras")
 
-print("Model saved!")
+print("Training finished!")
+print("Saved: final_model.keras")
