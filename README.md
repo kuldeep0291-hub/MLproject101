@@ -263,12 +263,6 @@ Steps:
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License. See `LICENSE` file for details.
-
----
-
 ## 👤 Author
 
 **Kuldeep Bishnoi**
