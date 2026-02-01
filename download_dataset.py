@@ -40,3 +40,6 @@ else:
     print("Not a zip file!") #if not a zip file it runs.
 
 print("All done!") #Bravo our work is done.
+
+
+#NOTE: Sometimes it may not work in case of many downloads so you may need to download it manually via the link.
